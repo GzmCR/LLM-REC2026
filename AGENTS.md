@@ -16,8 +16,11 @@ For project-related explanations, prefer Chinese unless the user asks otherwise.
 - Official SFT JSONL data lives under `dataset/`.
 - Project docs live under `docs/`.
 - Data script implementations live under `scripts/data/`.
-  `scripts/analyze_data.py` and `scripts/build_augmented_datasets.py` are
-  compatibility entrypoints and should stay usable.
+  `scripts/analyze_data.py`, `scripts/build_augmented_datasets.py`, and
+  `scripts/build_general_mcq_dataset.py` are compatibility entrypoints and
+  should stay usable.
+- Local eval scripts live under `scripts/eval/`, with config under
+  `configs/eval/`.
 - Training scripts live under `scripts/train/`.
 - Training config lives under `configs/train/`.
 - Conda environment specs live under `envs/`.
@@ -29,6 +32,7 @@ Never commit or upload these local data/artifact directories:
 - `dataset/`
 - `Explorer_LLM_Rec_Competition/data/`
 - `generated_dataset/`
+- `data_eval/`
 - `outputs/`
 - `train_data/`
 - `train_output/`
@@ -60,6 +64,27 @@ python scripts/build_augmented_datasets.py \
   --out-dir generated_dataset \
   --max-rows 50000 \
   --max-samples-per-task 5000 \
+  --seed 2026
+```
+
+Build general MCQ training/eval datasets from local CMMLU/MMLU:
+
+```bash
+python scripts/build_general_mcq_dataset.py \
+  --cmmlu-dir dataset/CMMLU \
+  --mmlu-dir dataset/MMLU \
+  --train-out generated_dataset/general_mcq_aux.jsonl \
+  --eval-out data_eval/general_mcq.jsonl \
+  --seed 2026
+```
+
+Build local proxy eval sets:
+
+```bash
+python scripts/eval/build_eval_sets.py \
+  --sft-dir dataset \
+  --mcq-path data_eval/general_mcq.jsonl \
+  --out-dir outputs/eval/eval_sets \
   --seed 2026
 ```
 

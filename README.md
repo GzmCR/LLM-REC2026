@@ -17,13 +17,17 @@
 ├── scripts/
 │   ├── analyze_data.py                  # 兼容入口
 │   ├── build_augmented_datasets.py      # 兼容入口
+│   ├── build_general_mcq_dataset.py     # 常识问答数据构造兼容入口
 │   ├── data/                            # 数据分析和增强数据构造实现
+│   ├── eval/                            # 本地评测 proxy
 │   └── train/                           # 服务器训练脚本
 ├── configs/train/                       # LLaMA-Factory 训练配置
+├── configs/eval/                        # 本地评测生成配置
 ├── envs/                                # conda 环境定义
 ├── ./Explorer_LLM_Rec_Competition/      # 官方说明、demo 和本地原始数据
 ├── dataset/                             # 官方 SFT JSONL，本地目录，不提交
 ├── generated_dataset/                   # 增强 SFT JSONL，本地生成，不提交
+├── data_eval/                           # 本地验证数据，不提交
 ├── outputs/                             # 数据分析产物，不提交
 ├── train_data/                          # LLaMA-Factory 训练 JSONL，不提交
 └── train_output/                        # 训练 checkpoint 和日志，不提交
@@ -33,7 +37,10 @@
 
 - `scripts/analyze_data.py`：数据分析脚本，分析 SFT JSONL 与原始 parquet 的字段覆盖、长度分布、SID 前缀、序列覆盖率和 join 覆盖率。
 - `scripts/build_augmented_datasets.py`：增强数据集构造脚本，从原始 parquet 生成多模板辅助 SFT JSONL。
+- `scripts/build_general_mcq_dataset.py`：把本地 CMMLU/MMLU 转成常识问答训练集和验证集。
+- `scripts/eval/`：本地评测 proxy，覆盖懂物料、懂用户、懂推荐、懂世界。
 - `docs/dataset_construction_strategy.md`：对 `dataset/` 来源、未充分利用字段、以及后续增强数据集构造方案的整理。
+- `docs/local_evaluation.md`：本地评测集构造、生成和打分流程。
 - `docs/competition_intro.md`、`docs/faq.md`：比赛背景和 FAQ 笔记。
 - `Explorer_LLM_Rec_Competition/README.md`：官方原始数据字段说明。
 - `Explorer_LLM_Rec_Competition/demo/`：官方 demo 转换与训练流程示例。
@@ -71,6 +78,7 @@
 - `dataset/`
 - `Explorer_LLM_Rec_Competition/data/`
 - `generated_dataset/`
+- `data_eval/`
 - `train_data/`
 - `train_output/`
 - `third_party/`
@@ -82,6 +90,7 @@
 - `OneReason_UserProfile` 本地分片约 813MB，不适合普通 GitHub 仓库。
 - `dataset/懂推荐*.jsonl`、`dataset/懂用户.jsonl` 单文件较大，也容易超过 GitHub 普通仓库限制。
 - `generated_dataset/`、`train_data/`、`train_output/` 属于可再生成的实验产物。
+- `data_eval/` 是本地验证数据目录，可能包含从公开 benchmark 转换来的题目。
 - `third_party/LLaMA-Factory/` 会在服务器安装脚本中自动克隆，不需要随仓库提交。
 - 数据集应通过官方渠道下载，并在本地按上述目录结构放置。
 
@@ -194,6 +203,71 @@ python "Explorer_LLM_Rec_Competition/demo/convert_jsonl.py" \
   --shuffle \
   --shuffle-seed 2026
 ```
+
+### 常识问答增强与验证数据
+
+如果已经把 CMMLU 和 MMLU 放在 `dataset/CMMLU`、`dataset/MMLU`，可以生成常识问答训练增强集和本地验证池：
+
+```bash
+python scripts/build_general_mcq_dataset.py \
+  --cmmlu-dir dataset/CMMLU \
+  --mmlu-dir dataset/MMLU \
+  --train-out generated_dataset/general_mcq_aux.jsonl \
+  --eval-out data_eval/general_mcq.jsonl \
+  --seed 2026 \
+  --max-train-samples 0 \
+  --max-eval-samples 0
+```
+
+输出：
+
+```text
+generated_dataset/general_mcq_aux.jsonl
+generated_dataset/general_mcq_aux.summary.json
+data_eval/general_mcq.jsonl
+data_eval/general_mcq.summary.json
+```
+
+其中 `generated_dataset/general_mcq_aux.jsonl` 会在训练数据准备时自动混入；`data_eval/general_mcq.jsonl` 用于本地 `懂世界` 评测，不参与训练。
+
+## 本地评测
+
+构造本地 proxy eval set：
+
+```bash
+python scripts/eval/build_eval_sets.py \
+  --sft-dir dataset \
+  --mcq-path data_eval/general_mcq.jsonl \
+  --out-dir outputs/eval/eval_sets \
+  --seed 2026 \
+  --eval-ratio 0.08 \
+  --max-per-task 1000
+```
+
+本地无 GPU 时可以先用 mock prediction 测试打分链路：
+
+```bash
+python scripts/eval/mock_predictions.py \
+  --eval-dir outputs/eval/eval_sets \
+  --out-dir outputs/eval/mock_predictions
+
+python scripts/eval/score_eval.py \
+  --eval-dir outputs/eval/eval_sets \
+  --pred-dir outputs/eval/mock_predictions \
+  --out-dir outputs/eval/reports
+```
+
+真实模型生成需要在 GPU 服务器运行：
+
+```bash
+python scripts/eval/run_generation.py \
+  --model-path train_output/onereason_0.8b_full_sft \
+  --eval-dir outputs/eval/eval_sets \
+  --out-dir outputs/eval/predictions \
+  --config configs/eval/local_eval.yaml
+```
+
+详细说明见 `docs/local_evaluation.md`。
 
 ## 服务器训练环境
 

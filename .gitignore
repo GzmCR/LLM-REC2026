@@ -21,6 +21,7 @@ Explorer_LLM_Rec_Competition/data/
 
 # Future generated training data
 generated_dataset/
+data_eval/
 
 # Downloaded training frameworks / local caches
 third_party/

@@ -10,11 +10,14 @@ OFFICIAL_DIR="${OFFICIAL_DIR:-dataset}"
 AUG_DIR="${AUG_DIR:-generated_dataset}"
 TRAIN_DATA_DIR="${TRAIN_DATA_DIR:-train_data}"
 CONVERT_SCRIPT="${CONVERT_SCRIPT:-Explorer_LLM_Rec_Competition/demo/convert_jsonl.py}"
+USE_EVAL_SPLIT="${USE_EVAL_SPLIT:-0}"
+EVAL_EXCLUSION_FILE="${EVAL_EXCLUSION_FILE:-outputs/eval/eval_sets/train_exclusion_ids.json}"
 
 OFFICIAL_OUT="$TRAIN_DATA_DIR/data_official.jsonl"
 AUG_OUT="$TRAIN_DATA_DIR/data_augmented.jsonl"
 MIXED_OUT="$TRAIN_DATA_DIR/data_mixed.jsonl"
 MIXED_TMP="$TRAIN_DATA_DIR/data_mixed.tmp.jsonl"
+OFFICIAL_INPUT="$OFFICIAL_DIR"
 
 if [ ! -d "$OFFICIAL_DIR" ]; then
   echo "[ERROR] official dataset dir not found: $OFFICIAL_DIR" >&2
@@ -27,9 +30,52 @@ fi
 
 mkdir -p "$TRAIN_DATA_DIR"
 
+if [ "$USE_EVAL_SPLIT" = "1" ]; then
+  if [ ! -f "$EVAL_EXCLUSION_FILE" ]; then
+    echo "[ERROR] USE_EVAL_SPLIT=1 but exclusion file not found: $EVAL_EXCLUSION_FILE" >&2
+    echo "[hint] build eval sets first with: python scripts/eval/build_eval_sets.py --sft-dir $OFFICIAL_DIR" >&2
+    exit 1
+  fi
+  OFFICIAL_INPUT="$TRAIN_DATA_DIR/sft_train_split"
+  echo "[run] create official train split excluding local eval samples -> $OFFICIAL_INPUT"
+  conda run -n "$ENV_NAME" python - "$OFFICIAL_DIR" "$OFFICIAL_INPUT" "$EVAL_EXCLUSION_FILE" <<'PY'
+import json
+import shutil
+import sys
+from pathlib import Path
+
+src_dir = Path(sys.argv[1])
+dst_dir = Path(sys.argv[2])
+exclusion_path = Path(sys.argv[3])
+
+if dst_dir.exists():
+    shutil.rmtree(dst_dir)
+dst_dir.mkdir(parents=True, exist_ok=True)
+
+raw = json.loads(exclusion_path.read_text(encoding="utf-8"))
+exclusions = {name: set(int(x) for x in lines) for name, lines in raw.items()}
+
+kept = 0
+dropped = 0
+for src in sorted(src_dir.rglob("*.jsonl")):
+    rel = src.relative_to(src_dir)
+    dst = dst_dir / rel
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    drop_lines = exclusions.get(src.name, set())
+    with src.open(encoding="utf-8") as fin, dst.open("w", encoding="utf-8") as fout:
+        for line_no, line in enumerate(fin, 1):
+            if line_no in drop_lines:
+                dropped += 1
+                continue
+            fout.write(line)
+            kept += 1
+print(f"[OK] kept={kept} dropped={dropped} dst={dst_dir}")
+PY
+fi
+
 echo "[run] convert official SFT JSONL -> $OFFICIAL_OUT"
 conda run -n "$ENV_NAME" python "$CONVERT_SCRIPT" \
-  --input "$OFFICIAL_DIR" \
+  --input "$OFFICIAL_INPUT" \
   --output "$OFFICIAL_OUT" \
   --shuffle \
   --shuffle-seed "$SEED"

@@ -1,0 +1,26 @@
+seed: 2026
+eval_ratio: 0.08
+max_per_task: 1000
+
+generation:
+  item_understanding:
+    num_return_sequences: 64
+    temperature: 0.8
+    top_p: 0.95
+    max_new_tokens: 512
+  recommendation:
+    think_sequences: 32
+    no_think_sequences: 32
+    temperature: 0.8
+    top_p: 0.95
+    max_new_tokens: 2048
+  user_interest:
+    num_return_sequences: 1
+    temperature: 0.2
+    top_p: 0.95
+    max_new_tokens: 2048
+  general_mcq:
+    num_return_sequences: 1
+    temperature: 0.0
+    top_p: 1.0
+    max_new_tokens: 64
