@@ -314,6 +314,30 @@ TORCHAUDIO_VERSION="2.7.1+cu126" \
 bash scripts/train/01_install_llamafactory.sh
 ```
 
+如果服务器访问 GitHub HTTPS 报 TLS 错误，例如：
+
+```text
+fatal: unable to access 'https://github.com/hiyouga/LLaMA-Factory.git/': TLS connect error
+```
+
+这通常是服务器网络到 GitHub 不稳定。可以改用 SSH 或可访问的镜像地址：
+
+```bash
+LLAMA_FACTORY_REPO=git@github.com:hiyouga/LLaMA-Factory.git \
+bash scripts/train/01_install_llamafactory.sh
+```
+
+也可以先手动 clone，成功后再重新运行安装脚本：
+
+```bash
+mkdir -p third_party
+git clone --depth 1 --branch v0.9.6.dev0 \
+  https://github.com/hiyouga/LLaMA-Factory.git \
+  third_party/LLaMA-Factory
+
+bash scripts/train/01_install_llamafactory.sh
+```
+
 ### 3. 准备训练数据
 
 官方数据放在：

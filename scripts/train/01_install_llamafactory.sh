@@ -8,6 +8,8 @@ ENV_NAME="${ENV_NAME:-llm-rec2026}"
 LF_DIR="${LLAMA_FACTORY_DIR:-third_party/LLaMA-Factory}"
 LF_REPO="${LLAMA_FACTORY_REPO:-https://github.com/hiyouga/LLaMA-Factory.git}"
 LF_REF="${LLAMA_FACTORY_REF:-v0.9.6.dev0}"
+LF_CLONE_RETRIES="${LLAMA_FACTORY_CLONE_RETRIES:-3}"
+LF_CLONE_DEPTH="${LLAMA_FACTORY_CLONE_DEPTH:-1}"
 TORCH_VERSION="${TORCH_VERSION:-2.7.1+cu126}"
 TORCHVISION_VERSION="${TORCHVISION_VERSION:-0.22.1+cu126}"
 TORCHAUDIO_VERSION="${TORCHAUDIO_VERSION:-2.7.1+cu126}"
@@ -15,13 +17,64 @@ CUDA_WHEEL_INDEX="${CUDA_WHEEL_INDEX:-https://download.pytorch.org/whl/cu126}"
 FLASH_ATTN_WHEEL="${FLASH_ATTN_WHEEL:-https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.7cxx11abiTRUE-cp311-cp311-linux_x86_64.whl}"
 LIGER_VERSION="${LIGER_VERSION:-0.8.0}"
 
+clone_llama_factory() {
+  local attempt
+  for attempt in $(seq 1 "$LF_CLONE_RETRIES"); do
+    echo "[run] clone attempt $attempt/$LF_CLONE_RETRIES: $LF_REPO -> $LF_DIR"
+    if git clone --depth "$LF_CLONE_DEPTH" --branch "$LF_REF" "$LF_REPO" "$LF_DIR"; then
+      return 0
+    fi
+    if [ "$attempt" -lt "$LF_CLONE_RETRIES" ]; then
+      echo "[WARN] clone failed; retrying in $((attempt * 5)) seconds..." >&2
+      rm -rf "$LF_DIR"
+      sleep $((attempt * 5))
+    fi
+  done
+
+  echo "[WARN] shallow clone for ref '$LF_REF' failed; trying default branch clone..." >&2
+  rm -rf "$LF_DIR"
+  for attempt in $(seq 1 "$LF_CLONE_RETRIES"); do
+    echo "[run] fallback clone attempt $attempt/$LF_CLONE_RETRIES: $LF_REPO -> $LF_DIR"
+    if git clone --depth "$LF_CLONE_DEPTH" "$LF_REPO" "$LF_DIR"; then
+      return 0
+    fi
+    if [ "$attempt" -lt "$LF_CLONE_RETRIES" ]; then
+      echo "[WARN] fallback clone failed; retrying in $((attempt * 5)) seconds..." >&2
+      rm -rf "$LF_DIR"
+      sleep $((attempt * 5))
+    fi
+  done
+
+  cat >&2 <<EOF
+[ERROR] failed to clone LLaMA-Factory from: $LF_REPO
+
+This is usually a GitHub/network TLS problem, not a training-script problem.
+Try one of these on the server:
+
+  # Use SSH if your server has a GitHub SSH key configured
+  LLAMA_FACTORY_REPO=git@github.com:hiyouga/LLaMA-Factory.git bash scripts/train/01_install_llamafactory.sh
+
+  # Or use your own reachable mirror/proxy URL
+  LLAMA_FACTORY_REPO=<reachable_git_url> bash scripts/train/01_install_llamafactory.sh
+
+  # Or pre-clone manually, then rerun this script
+  mkdir -p third_party
+  git clone --depth $LF_CLONE_DEPTH --branch $LF_REF $LF_REPO $LF_DIR
+  bash scripts/train/01_install_llamafactory.sh
+EOF
+  return 1
+}
+
 mkdir -p "$(dirname "$LF_DIR")"
 
 if [ -d "$LF_DIR/.git" ]; then
   echo "[skip] $LF_DIR already exists"
 else
-  echo "[run] clone LLaMA-Factory -> $LF_DIR"
-  git clone "$LF_REPO" "$LF_DIR"
+  if [ -e "$LF_DIR" ]; then
+    echo "[WARN] removing incomplete non-git directory: $LF_DIR" >&2
+    rm -rf "$LF_DIR"
+  fi
+  clone_llama_factory
 fi
 
 echo "[run] checkout LLaMA-Factory ref: $LF_REF"
