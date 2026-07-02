@@ -338,6 +338,21 @@ git clone --depth 1 --branch v0.9.6.dev0 \
 bash scripts/train/01_install_llamafactory.sh
 ```
 
+如果服务器完全无法 clone GitHub，可以在本机浏览器下载源码压缩包，再上传到服务器：
+
+```text
+https://github.com/hiyouga/LLaMA-Factory/archive/refs/tags/v0.9.6.dev0.zip
+```
+
+上传后运行：
+
+```bash
+LLAMA_FACTORY_ARCHIVE=/path/to/LLaMA-Factory-0.9.6.dev0.zip \
+bash scripts/train/01_install_llamafactory.sh
+```
+
+脚本会把压缩包解到 `third_party/LLaMA-Factory/`，并跳过 Git checkout。
+
 ### 3. 准备训练数据
 
 官方数据放在：
