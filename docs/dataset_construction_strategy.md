@@ -9,11 +9,11 @@
 
 当前仓库中与数据转换直接相关的脚本有两个：
 
-- ` Explorer_LLM_Rec_Competition/demo/convert_jsonl.py`
+- `Explorer_LLM_Rec_Competition/demo/convert_jsonl.py`
   - 输入：已经构造好的 `{system, prompt, response}` JSONL。
   - 输出：LLaMA-Factory/Alpaca 风格 `{instruction, input, output, history}` JSONL。
   - 作用：只是格式转换，不负责从原始用户行为表构造样本。
-- ` Explorer_LLM_Rec_Competition/demo/convertv2.py`
+- `Explorer_LLM_Rec_Competition/demo/convertv2.py`
   - 输入：包含 `messages` 字段的 parquet。
   - 输出：Alpaca JSONL。
   - 作用：处理 message 对话格式、清理 SID 结束符、补 `<think>` 模式，也不是从 `OneReason_UserProfile` 的 63 列行为特征构造推荐样本。

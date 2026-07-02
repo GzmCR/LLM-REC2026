@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility entrypoint for scripts/data/analyze_data.py."""
+"""Compatibility entrypoint for scripts/data/build_augmented_datasets.py."""
 
 from __future__ import annotations
 
@@ -8,5 +8,5 @@ from pathlib import Path
 
 
 if __name__ == "__main__":
-    target = Path(__file__).resolve().parent / "data" / "analyze_data.py"
+    target = Path(__file__).resolve().parent / "data" / "build_augmented_datasets.py"
     runpy.run_path(str(target), run_name="__main__")

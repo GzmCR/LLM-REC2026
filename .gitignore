@@ -12,13 +12,19 @@ __pycache__/
 
 # Generated analysis artifacts
 outputs/
+train_data/
+train_output/
 
 # Competition data: keep local only
 dataset/
-\ Explorer_LLM_Rec_Competition/data/
+Explorer_LLM_Rec_Competition/data/
 
 # Future generated training data
 generated_dataset/
+
+# Downloaded training frameworks / local caches
+third_party/
+.cache/
 
 # Model/checkpoint outputs
 *.safetensors
